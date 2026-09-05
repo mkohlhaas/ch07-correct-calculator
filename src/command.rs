@@ -71,9 +71,9 @@ pub trait Command {
 // 3. Concrete commands //
 // ==================== //
 
-// ======================== //
+// ------------------------ //
 // A. Evaluates expressions //
-// ======================== //
+// ------------------------ //
 
 pub struct EvaluateCommand {
     expression: String,
@@ -118,9 +118,9 @@ impl Command for EvaluateCommand {
     }
 }
 
-// ================= //
+// ----------------- //
 // B. Sets variables //
-// ================= //
+// ----------------- //
 
 pub struct SetVariableCommand {
     name: String,
@@ -163,9 +163,9 @@ impl Command for SetVariableCommand {
     }
 }
 
-// ======================= //
+// ----------------------- //
 // C. Clears all variables //
-// ======================= //
+// ----------------------- //
 
 pub struct ClearVariablesCommand {
     previous_variables: Option<HashMap<String, f64>>,

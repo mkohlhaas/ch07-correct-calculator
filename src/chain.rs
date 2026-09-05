@@ -42,9 +42,9 @@ pub trait InputHandler {
 // The handlers itself don't have their `next` fields.
 // Just a design decision, I guess.
 
-// =============== //
+// --------------- //
 // A. Base Handler //
-// =============== //
+// --------------- //
 
 pub struct BaseHandler {
     next: Option<Box<dyn InputHandler>>,
@@ -71,9 +71,9 @@ impl InputHandler for BaseHandler {
     }
 }
 
-// ================== //
+// ------------------ //
 // B. Command Handler //
-// ================== //
+// ------------------ //
 
 // Handles special commands like undo, redo, history
 pub struct CommandHandler {
@@ -135,9 +135,9 @@ impl InputHandler for CommandHandler {
     }
 }
 
-// =================== //
+// ------------------- //
 // C. Variable Handler //
-// =================== //
+// ------------------- //
 
 // Handles variable assignments (e.g. x = 5)
 pub struct VariableAssignmentHandler {
@@ -187,9 +187,9 @@ impl InputHandler for VariableAssignmentHandler {
     }
 }
 
-// ==================== //
+// -------------------- //
 // D. ExpressionHandler //
-// ==================== //
+// -------------------- //
 
 // Handles expressions by evaluating them
 pub struct ExpressionHandler {
