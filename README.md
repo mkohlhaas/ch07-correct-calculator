@@ -33,6 +33,10 @@ When running, try the following commands:
 - Expressions like `2 + 3 * 4`
 - Variable assignment like `x = 5`
 - Commands like `/undo`, `/redo`, `/history`
-- `/demo_ch6` to see Chapter 6 structural patterns in action
+- From the menu, pick the calculator implementation you want to run (Command Processor, Mediator, Template Method, or Strategy)
+
+## Architecture
+
+See [docs/architecture.md](docs/architecture.md) for ASCII diagrams showing the runtime flow, module dependencies, and the concrete Rust types behind each design pattern.
 
 This version builds on Chapter 6 and will be further enhanced in Chapter 8.
