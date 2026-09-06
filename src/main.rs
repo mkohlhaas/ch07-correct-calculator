@@ -200,7 +200,7 @@ fn main() {
     println!("or commands (/help, /undo, /redo, /history, /clear, /exit)");
 
     // Set up the calculator components (combining Ch6 & Ch7 patterns)
-    let mut processor = CommandProcessor::new();
+    let mut processor = CommandProcessor::default();
     let parser = ExpressionParser::new();
     let input_chain = create_input_chain(parser);
 

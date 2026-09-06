@@ -7,6 +7,7 @@ use std::{collections::HashMap, time::SystemTime};
 // 1. The Receiver: Holds the application state //
 // ============================================ //
 
+#[derive(Default)]
 pub struct Calculator {
     pub variables: HashMap<String, f64>,
     pub calc_history: Vec<Calculation>,
@@ -14,14 +15,6 @@ pub struct Calculator {
 }
 
 impl Calculator {
-    pub fn new() -> Self {
-        Self {
-            variables: HashMap::new(),
-            calc_history: Vec::new(),
-            last_result: None,
-        }
-    }
-
     pub fn set_variable(&mut self, name: &str, value: f64) {
         self.variables.insert(name.to_string(), value);
     }
@@ -204,6 +197,7 @@ impl Command for ClearVariablesCommand {
 // 4. The Command Processor: Manages history and schedules execution //
 // ================================================================= //
 
+#[derive(Default)]
 pub struct CommandProcessor {
     calculator: Calculator,
     cmd_history: Vec<Box<dyn Command>>,
@@ -211,13 +205,6 @@ pub struct CommandProcessor {
 }
 
 impl CommandProcessor {
-    pub fn new() -> Self {
-        Self {
-            calculator: Calculator::new(),
-            cmd_history: Vec::new(),
-            undo_stack: Vec::new(),
-        }
-    }
 
     pub fn execute(&mut self, mut command: Box<dyn Command>) -> Result<Option<f64>, String> {
         let result = command.execute(&mut self.calculator)?;

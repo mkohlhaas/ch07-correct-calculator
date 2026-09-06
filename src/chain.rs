@@ -93,7 +93,6 @@ impl InputHandler for CommandHandler {
         let trimmed = input.trim();
 
         if let Some(cmd) = trimmed.strip_prefix("/") {
-            // TODO: cmds should be enums
             match cmd {
                 "undo" => {
                     processor.undo()?;
