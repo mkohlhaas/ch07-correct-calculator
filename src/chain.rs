@@ -240,8 +240,8 @@ impl InputHandler for ExpressionHandler {
 
 // Function to create the chain of handlers
 pub fn create_input_chain() -> Box<CommandHandler> {
-    let parser = ExpressionParser::new();
     let mut command_handler = CommandHandler::new();
+    let parser = ExpressionParser::new();
     let mut var_handler = VariableAssignmentHandler::new(parser.clone());
     let expr_handler = ExpressionHandler::new(parser);
 
@@ -342,10 +342,7 @@ mod tests {
         chain.handle("2 + 3", &mut processor).unwrap();
         chain.handle("x = 1", &mut processor).unwrap();
 
-        assert_eq!(
-            chain.handle("/history", &mut processor).unwrap(),
-            None
-        );
+        assert_eq!(chain.handle("/history", &mut processor).unwrap(), None);
         assert_eq!(processor.history().len(), 2);
     }
 
