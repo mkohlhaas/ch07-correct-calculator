@@ -190,7 +190,6 @@ mod adapter {
 use chain::{InputHandler, create_input_chain};
 use command::CommandProcessor;
 use mediator::CalculatorMediator;
-use parser::ExpressionParser;
 use std::io::{self, Write};
 
 fn main() {
@@ -233,8 +232,7 @@ fn run_with_command_processor() {
 
     // Set up the calculator components (combining Ch6 & Ch7 patterns)
     let mut processor = CommandProcessor::default();
-    let parser = ExpressionParser::new();
-    let input_chain = create_input_chain(parser);
+    let input_chain = create_input_chain();
 
     loop {
         print!("> ");

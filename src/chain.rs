@@ -225,7 +225,8 @@ impl InputHandler for ExpressionHandler {
 }
 
 // Function to create the chain of handlers
-pub fn create_input_chain(parser: ExpressionParser) -> Box<CommandHandler> {
+pub fn create_input_chain() -> Box<CommandHandler> {
+    let parser = ExpressionParser::new();
     let mut command_handler = CommandHandler::new();
     let mut var_handler = VariableAssignmentHandler::new(parser.clone());
     let expr_handler = ExpressionHandler::new(parser);
@@ -242,7 +243,7 @@ mod tests {
     use super::*;
 
     fn chain() -> Box<CommandHandler> {
-        create_input_chain(ExpressionParser::new())
+        create_input_chain()
     }
 
     #[test]
