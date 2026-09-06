@@ -228,11 +228,11 @@ fn main() {
 fn run_with_command_processor() {
     println!("Correct Calculator with Command Processor");
     println!("Type expressions to evaluate, variables to set (x = 5),");
-    println!("or commands (/help, /undo, /redo, /history, /clear, /exit)");
+    println!("or commands (/help, /undo, /redo, /history, /vars, /clear, /exit)");
 
     // Set up the calculator components (combining Ch6 & Ch7 patterns)
-    let mut processor = CommandProcessor::default();
     let input_chain = create_input_chain();
+    let mut processor = CommandProcessor::default();
 
     loop {
         print!("> ");

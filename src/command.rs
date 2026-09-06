@@ -194,6 +194,42 @@ impl Command for ClearVariablesCommand {
     }
 }
 
+// ------------------------ //
+// D. Shows all variables   //
+// ------------------------ //
+
+pub struct ShowVariablesCommand;
+
+impl ShowVariablesCommand {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl Command for ShowVariablesCommand {
+    fn execute(&mut self, calculator: &mut Calculator) -> Result<Option<f64>, String> {
+        let mut vars: Vec<_> = calculator.variables.iter().collect();
+        vars.sort_by(|a, b| a.0.cmp(b.0));
+
+        if vars.is_empty() {
+            println!("(no variables defined)");
+        } else {
+            for (name, value) in vars {
+                println!("{} = {}", name, value);
+            }
+        }
+        Ok(None)
+    }
+
+    fn undo(&self, _calculator: &mut Calculator) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn description(&self) -> String {
+        "Show variables".to_string()
+    }
+}
+
 // ================================================================= //
 // 4. The Command Processor: Manages history and schedules execution //
 // ================================================================= //
@@ -393,6 +429,17 @@ mod tests {
         processor.undo().unwrap();
         assert_eq!(processor.get_calculator().get_variable("x"), Some(5.0));
         assert_eq!(processor.get_calculator().get_variable("y"), Some(6.0));
+    }
+
+    #[test]
+    fn show_variables_command_lists_variables() {
+        let mut processor = CommandProcessor::default();
+        processor.get_calculator_mut().set_variable("x", 5.0);
+        processor.get_calculator_mut().set_variable("y", 6.0);
+
+        let show = Box::new(ShowVariablesCommand::new());
+        let result = processor.execute(show).unwrap();
+        assert_eq!(result, None);
     }
 
     #[test]
