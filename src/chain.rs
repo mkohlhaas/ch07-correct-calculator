@@ -42,9 +42,20 @@ pub trait InputHandler {
 // The handlers itself don't have their `next` fields.
 // Just a design decision, I guess.
 
-// --------------- //
-// A. Base Handler //
-// --------------- //
+// ---------------- //
+// A. Base Handler  //
+// ---------------- //
+
+// BaseHandler is the forwarding/delegation link in the Chain of Responsibility.
+// It holds no domain logic: it only stores a reference to the next handler in the
+// chain (`next`) and passes the request down to it. The concrete handlers
+// (CommandHandler, VariableAssignmentHandler, ExpressionHandler) each embed a
+// BaseHandler so that any handler can act as either a terminal processor or a
+// pass-through link without duplicating the delegation code.
+//
+//   - handle():    forwards input to `next`, or returns "No handler found..."
+//                  when there is no next handler (end of chain)
+//   - set_next():  links the next handler in the chain
 
 pub struct BaseHandler {
     next: Option<Box<dyn InputHandler>>,
