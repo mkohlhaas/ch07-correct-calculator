@@ -347,3 +347,146 @@ pub fn create_mediator_system() -> Arc<Mutex<CalculatorMediatorImpl>> {
 
     mediator
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::AngleMode;
+    use std::collections::HashMap;
+
+    #[derive(Default)]
+    struct MockMediator {
+        events: Mutex<Vec<String>>,
+        variables: Mutex<HashMap<String, f64>>,
+    }
+
+    impl CalculatorMediator for MockMediator {
+        fn notify(&mut self, sender: &str, event: CalculatorEvent) {
+            let description = match event {
+                CalculatorEvent::ResultComputed(result) => format!("result:{}", result),
+                CalculatorEvent::VariableChanged(name, value) => {
+                    format!("var:{}={}", name, value)
+                }
+                CalculatorEvent::ModeChanged(mode) => format!("mode:{}", mode),
+                CalculatorEvent::DisplayUpdate(message) => format!("display:{}", message),
+                CalculatorEvent::ErrorOccurred(error) => format!("error:{}", error),
+            };
+            self.events.lock().unwrap().push(format!("{}->{}", sender, description));
+        }
+
+        fn get_result(&self) -> Option<f64> {
+            None
+        }
+
+        fn get_variable(&self, name: &str) -> Option<f64> {
+            self.variables.lock().unwrap().get(name).copied()
+        }
+
+        fn get_all_variables(&self) -> HashMap<String, f64> {
+            self.variables.lock().unwrap().clone()
+        }
+
+        fn set_variable(&mut self, name: &str, value: f64) {
+            self.variables.lock().unwrap().insert(name.to_string(), value);
+        }
+
+        fn evaluate(&mut self, _expression: &str) -> Result<f64, String> {
+            Err("Mock mediator cannot evaluate".to_string())
+        }
+
+        fn change_angle_mode(&mut self, _mode: AngleMode) {
+            self.events.lock().unwrap().push("change_angle_mode".to_string());
+        }
+    }
+
+    // Components hold a *mock* mediator so that locking the real mediator does not deadlock
+    // (std Mutex is not reentrant).
+    fn setup() -> (Arc<Mutex<CalculatorMediatorImpl>>, Arc<Mutex<MockMediator>>) {
+        let real = Arc::new(Mutex::new(CalculatorMediatorImpl::new()));
+        let mock = Arc::new(Mutex::new(MockMediator::default()));
+        let mock_dyn: Arc<Mutex<dyn CalculatorMediator>> = mock.clone();
+
+        let evaluator = Arc::new(EvaluationComponent::new(mock_dyn.clone()));
+        let variables = Arc::new(Mutex::new(VariableStorage::new(mock_dyn.clone())));
+        let display = Arc::new(Mutex::new(ConsoleDisplay::new(mock_dyn.clone())));
+
+        {
+            let mut mediator = real.lock().unwrap();
+            mediator.set_evaluator(evaluator);
+            mediator.set_variables(variables);
+            mediator.set_display(display);
+        }
+
+        (real, mock)
+    }
+
+    #[test]
+    fn mediator_evaluates_expressions() {
+        let (mediator, mock) = setup();
+
+        let result = mediator.lock().unwrap().evaluate("2 + 3").unwrap();
+        assert_eq!(result, 5.0);
+
+        let mock_guard = mock.lock().unwrap();
+        let events = mock_guard.events.lock().unwrap();
+        assert!(events.contains(&"evaluator->result:5".to_string()));
+    }
+
+    #[test]
+    fn mediator_errors_without_registered_evaluator() {
+        let mediator = Arc::new(Mutex::new(CalculatorMediatorImpl::new()));
+        assert_eq!(
+            mediator.lock().unwrap().evaluate("1 + 1").unwrap_err(),
+            "Evaluator not initialized"
+        );
+    }
+
+    #[test]
+    fn mediator_manages_variables() {
+        let (mediator, mock) = setup();
+
+        {
+            let mut mediator = mediator.lock().unwrap();
+            mediator.set_variable("x", 5.0);
+            assert_eq!(mediator.get_variable("x"), Some(5.0));
+            assert_eq!(mediator.get_all_variables().get("x"), Some(&5.0));
+        }
+
+        let mock_guard = mock.lock().unwrap();
+        let events = mock_guard.events.lock().unwrap();
+        assert!(events.contains(&"variables->var:x=5".to_string()));
+    }
+
+    #[test]
+    fn mediator_returns_none_for_unset_variables() {
+        let mediator = Arc::new(Mutex::new(CalculatorMediatorImpl::new()));
+        assert_eq!(mediator.lock().unwrap().get_variable("x"), None);
+    }
+
+    #[test]
+    fn mediator_derives_variable_expressions() {
+        let (mediator, _mock) = setup();
+
+        {
+            let mut mediator = mediator.lock().unwrap();
+            mediator.set_variable("x", 4.0);
+        }
+
+        let result = mediator.lock().unwrap().evaluate("6 * 7").unwrap();
+        assert_eq!(result, 42.0);
+    }
+
+    #[test]
+    fn change_angle_mode_is_safe_without_display() {
+        let mediator = Arc::new(Mutex::new(CalculatorMediatorImpl::new()));
+        let mut mediator = mediator.lock().unwrap();
+        mediator.change_angle_mode(AngleMode::Degrees);
+    }
+
+    #[test]
+    fn create_mediator_system_initializes_all_components() {
+        let system = create_mediator_system();
+        assert_eq!(system.lock().unwrap().get_result(), None);
+        assert_eq!(system.lock().unwrap().get_variable("x"), None);
+    }
+}

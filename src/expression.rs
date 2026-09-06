@@ -208,3 +208,129 @@ impl Expression for FunctionCall {
         4 // Function calls have highest precedence
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::token::{Function, Operator};
+
+    fn vars() -> HashMap<String, f64> {
+        HashMap::new()
+    }
+
+    fn number(value: f64) -> Box<dyn Expression> {
+        Box::new(NumberExpression::new(value))
+    }
+
+    #[test]
+    fn number_expression_evaluates_to_its_value() {
+        let expr = NumberExpression::new(42.5);
+        assert_eq!(expr.evaluate(&vars()).unwrap(), 42.5);
+        assert_eq!(expr.to_string(), "42.5");
+        assert_eq!(expr.precedence(), 0);
+    }
+
+    #[test]
+    fn variable_expression_reads_from_variables() {
+        let expr = VariableExpression::new("x");
+        assert_eq!(expr.to_string(), "x");
+
+        let mut variables = vars();
+        variables.insert("x".to_string(), 7.0);
+        assert_eq!(expr.evaluate(&variables).unwrap(), 7.0);
+    }
+
+    #[test]
+    fn variable_expression_errors_when_undefined() {
+        let expr = VariableExpression::new("missing");
+        let err = expr.evaluate(&vars()).unwrap_err();
+        assert_eq!(err, "Undefined variable: missing");
+    }
+
+    #[test]
+    fn binary_operation_arithmetic() {
+        let add = BinaryOperation::new(number(2.0), number(3.0), Operator::Add);
+        assert_eq!(add.evaluate(&vars()).unwrap(), 5.0);
+
+        let sub = BinaryOperation::new(number(8.0), number(3.0), Operator::Subtract);
+        assert_eq!(sub.evaluate(&vars()).unwrap(), 5.0);
+
+        let mul = BinaryOperation::new(number(6.0), number(7.0), Operator::Multiply);
+        assert_eq!(mul.evaluate(&vars()).unwrap(), 42.0);
+
+        let pow = BinaryOperation::new(number(2.0), number(10.0), Operator::Power);
+        assert_eq!(pow.evaluate(&vars()).unwrap(), 1024.0);
+    }
+
+    #[test]
+    fn binary_operation_division() {
+        let div = BinaryOperation::new(number(10.0), number(4.0), Operator::Divide);
+        assert_eq!(div.evaluate(&vars()).unwrap(), 2.5);
+
+        let div_by_zero = BinaryOperation::new(number(10.0), number(0.0), Operator::Divide);
+        assert_eq!(div_by_zero.evaluate(&vars()).unwrap_err(), "Division by zero");
+    }
+
+    #[test]
+    fn binary_operation_precedence() {
+        assert_eq!(
+            BinaryOperation::new(number(1.0), number(2.0), Operator::Add).precedence(),
+            1
+        );
+        assert_eq!(
+            BinaryOperation::new(number(1.0), number(2.0), Operator::Multiply).precedence(),
+            2
+        );
+        assert_eq!(
+            BinaryOperation::new(number(1.0), number(2.0), Operator::Power).precedence(),
+            3
+        );
+    }
+
+    #[test]
+    fn binary_operation_to_string_adds_parens_when_needed() {
+        let simple = BinaryOperation::new(number(1.0), number(2.0), Operator::Add);
+        assert_eq!(simple.to_string(), "(1) + (2)");
+
+        let nested = BinaryOperation::new(number(1.0), number(2.0), Operator::Add);
+        let outer = BinaryOperation::new(number(3.0), Box::new(nested), Operator::Multiply);
+        assert_eq!(outer.to_string(), "(3) * ((1) + (2))");
+    }
+
+    #[test]
+    fn function_call_evaluates_functions() {
+        let sin = FunctionCall::new(Function::Sin, number(0.0));
+        assert_eq!(sin.evaluate(&vars()).unwrap(), 0.0);
+
+        let cos = FunctionCall::new(Function::Cos, number(0.0));
+        assert_eq!(cos.evaluate(&vars()).unwrap(), 1.0);
+
+        let tan = FunctionCall::new(Function::Tan, number(0.0));
+        assert_eq!(tan.evaluate(&vars()).unwrap(), 0.0);
+
+        let sqrt = FunctionCall::new(Function::Sqrt, number(16.0));
+        assert_eq!(sqrt.evaluate(&vars()).unwrap(), 4.0);
+    }
+
+    #[test]
+    fn function_call_errors() {
+        let sqrt = FunctionCall::new(Function::Sqrt, number(-4.0));
+        assert_eq!(
+            sqrt.evaluate(&vars()).unwrap_err(),
+            "Cannot take square root of negative number"
+        );
+
+        let tan = FunctionCall::new(Function::Tan, number(std::f64::consts::PI / 2.0));
+        assert_eq!(tan.evaluate(&vars()).unwrap_err(), "Tangent undefined at this value");
+    }
+
+    #[test]
+    fn function_call_to_string_and_precedence() {
+        let sqrt = FunctionCall::new(Function::Sqrt, number(16.0));
+        assert_eq!(sqrt.to_string(), "sqrt(16)");
+        assert_eq!(sqrt.precedence(), 4);
+
+        let sin = FunctionCall::new(Function::Sin, Box::new(VariableExpression::new("x")));
+        assert_eq!(sin.to_string(), "sin(x)");
+    }
+}

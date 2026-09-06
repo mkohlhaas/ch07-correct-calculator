@@ -236,3 +236,104 @@ pub fn create_input_chain(parser: ExpressionParser) -> Box<CommandHandler> {
 
     Box::new(command_handler)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn chain() -> Box<CommandHandler> {
+        create_input_chain(ExpressionParser::new())
+    }
+
+    #[test]
+    fn evaluates_expressions() {
+        let mut processor = CommandProcessor::default();
+        let result = chain().handle("2 + 3", &mut processor).unwrap();
+        assert_eq!(result, Some(5.0));
+        assert_eq!(processor.get_calculator().last_result, Some(5.0));
+    }
+
+    #[test]
+    fn assigns_and_uses_variables() {
+        let mut processor = CommandProcessor::default();
+        let chain = chain();
+
+        assert_eq!(chain.handle("x = 5", &mut processor).unwrap(), Some(5.0));
+        assert_eq!(processor.get_calculator().get_variable("x"), Some(5.0));
+
+        assert_eq!(chain.handle("x + 1", &mut processor).unwrap(), Some(6.0));
+
+        assert_eq!(chain.handle("x = 10", &mut processor).unwrap(), Some(10.0));
+        assert_eq!(chain.handle("x * 2", &mut processor).unwrap(), Some(20.0));
+    }
+
+    #[test]
+    fn rejects_invalid_variable_names() {
+        let mut processor = CommandProcessor::default();
+        let err = chain().handle("a b = 5", &mut processor).unwrap_err();
+        assert_eq!(err, "Invalid variable name: a b");
+    }
+
+    #[test]
+    fn undo_redo_commands() {
+        let mut processor = CommandProcessor::default();
+        let chain = chain();
+
+        chain.handle("7 * 6", &mut processor).unwrap();
+        assert_eq!(processor.get_calculator().last_result, Some(42.0));
+
+        chain.handle("/undo", &mut processor).unwrap();
+        assert_eq!(processor.get_calculator().last_result, None);
+
+        chain.handle("/redo", &mut processor).unwrap();
+        assert_eq!(processor.get_calculator().last_result, Some(42.0));
+    }
+
+    #[test]
+    fn undo_with_no_history_errors() {
+        let mut processor = CommandProcessor::default();
+        let err = chain().handle("/undo", &mut processor).unwrap_err();
+        assert_eq!(err, "Nothing to undo");
+    }
+
+    #[test]
+    fn clear_command_resets_variables() {
+        let mut processor = CommandProcessor::default();
+        let chain = chain();
+
+        chain.handle("x = 5", &mut processor).unwrap();
+        assert!(!processor.get_calculator().variables.is_empty());
+
+        chain.handle("/clear", &mut processor).unwrap();
+        assert!(processor.get_calculator().variables.is_empty());
+    }
+
+    #[test]
+    fn history_command_reports_commands() {
+        let mut processor = CommandProcessor::default();
+        let chain = chain();
+
+        chain.handle("2 + 3", &mut processor).unwrap();
+        chain.handle("x = 1", &mut processor).unwrap();
+
+        assert_eq!(
+            chain.handle("/history", &mut processor).unwrap(),
+            None
+        );
+        assert_eq!(processor.history().len(), 2);
+    }
+
+    #[test]
+    fn unmatched_input_reaches_expression_handler_and_errors() {
+        let mut processor = CommandProcessor::default();
+        assert!(chain().handle("2 +", &mut processor).is_err());
+    }
+
+    #[test]
+    fn base_handler_without_next_returns_no_handler_found() {
+        let mut processor = CommandProcessor::default();
+        let handler = BaseHandler::new();
+        let err = handler.handle("anything", &mut processor).unwrap_err();
+        assert_eq!(err, "No handler found for input: anything");
+    }
+}

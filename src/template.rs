@@ -338,3 +338,109 @@ pub fn create_evaluator(use_recursive_descent: bool) -> Box<dyn ExpressionEvalua
         Box::new(ShuntingYardEvaluator::new())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    fn eval(evaluator: &dyn ExpressionEvaluator, expression: &str) -> Result<f64, String> {
+        evaluator.evaluate(expression, &HashMap::new())
+    }
+
+    fn eval_with_vars(
+        evaluator: &dyn ExpressionEvaluator,
+        expression: &str,
+        variables: &[(&str, f64)],
+    ) -> Result<f64, String> {
+        let vars: HashMap<String, f64> = variables
+            .iter()
+            .map(|(k, v)| (k.to_string(), *v))
+            .collect();
+        evaluator.evaluate(expression, &vars)
+    }
+
+    #[test]
+    fn recursive_descent_evaluates_arithmetic() {
+        let evaluator = create_evaluator(true);
+        assert_eq!(eval(&*evaluator, "2 + 3 * 4").unwrap(), 14.0);
+        assert_eq!(eval(&*evaluator, "10 - 3 + 1").unwrap(), 8.0);
+        assert_eq!(eval(&*evaluator, "6 * 7").unwrap(), 42.0);
+    }
+
+    #[test]
+    fn recursive_descent_evaluates_variable_expressions() {
+        let evaluator = create_evaluator(true);
+        assert_eq!(
+            eval_with_vars(&*evaluator, "x + 1", &[("x", 6.0)]).unwrap(),
+            7.0
+        );
+        assert_eq!(
+            eval_with_vars(&*evaluator, "x * 3", &[("x", 4.0)]).unwrap(),
+            12.0
+        );
+    }
+
+    #[test]
+    fn shunting_yard_evaluates_arithmetic() {
+        let evaluator = create_evaluator(false);
+        assert_eq!(eval(&*evaluator, "2 + 3 * 4").unwrap(), 14.0);
+        assert_eq!(eval(&*evaluator, "( 1 + 2 ) * 3").unwrap(), 9.0);
+        assert_eq!(eval(&*evaluator, "2 * ( 3 + 4 )").unwrap(), 14.0);
+    }
+
+    #[test]
+    fn shunting_yard_evaluates_functions_and_variables() {
+        let evaluator = create_evaluator(false);
+        assert_eq!(eval(&*evaluator, "sqrt ( 16 )").unwrap(), 4.0);
+        assert_eq!(
+            eval_with_vars(&*evaluator, "x * 2", &[("x", 5.0)]).unwrap(),
+            10.0
+        );
+    }
+
+    #[test]
+    fn empty_expression_is_rejected() {
+        let recursive = create_evaluator(true);
+        assert!(eval(&*recursive, "").is_err());
+
+        let shunting_yard = create_evaluator(false);
+        assert!(eval(&*shunting_yard, "").is_err());
+    }
+
+    #[test]
+    fn mismatched_parentheses_are_rejected() {
+        let recursive = create_evaluator(true);
+        assert_eq!(eval(&*recursive, "( 1 + 2").unwrap_err(), "Mismatched parentheses");
+
+        let shunting_yard = create_evaluator(false);
+        assert_eq!(eval(&*shunting_yard, "( 1 + 2").unwrap_err(), "Unbalanced parenthesis");
+    }
+
+    #[test]
+    fn shunting_yard_rejects_unbalanced_operands() {
+        let evaluator = create_evaluator(false);
+        assert_eq!(
+            eval(&*evaluator, "2 +").unwrap_err(),
+            "Unbalanced expression: check operands and operators"
+        );
+    }
+
+    #[test]
+    fn recursive_descent_rejects_undefined_variables() {
+        let evaluator = create_evaluator(true);
+        assert_eq!(eval(&*evaluator, "x + 1").unwrap_err(), "Undefined variable: x");
+    }
+
+    #[test]
+    fn factory_returns_proper_types() {
+        let mut variables = HashMap::new();
+        variables.insert("x".to_string(), 3.0);
+
+        let recursive = create_evaluator(true);
+        assert_eq!(recursive.evaluate("x * 3", &variables).unwrap(), 9.0);
+
+        let shunting_yard = create_evaluator(false);
+        assert_eq!(shunting_yard.evaluate("x * 3", &variables).unwrap(), 9.0);
+    }
+}

@@ -433,3 +433,88 @@ fn run_with_strategy() {
 
     println!("Goodbye!");
 }
+
+#[cfg(test)]
+mod tests {
+    use super::adapter::ScientificOperations;
+    use super::adapter::StandardScientificOperations;
+    use super::bridge::{Display, Evaluator, StandardEvaluator};
+    use super::config::AngleMode;
+    use super::expression::{BinaryOperation, NumberExpression};
+    use super::token::Operator;
+    use std::collections::HashMap;
+
+    fn approx_eq(a: f64, b: f64) -> bool {
+        (a - b).abs() < 1e-9
+    }
+
+    #[test]
+    fn standard_operations_radians() {
+        let ops = StandardScientificOperations {
+            angle_mode: AngleMode::Radians,
+        };
+        assert!(approx_eq(ops.sin(std::f64::consts::PI / 2.0), 1.0));
+        assert!(approx_eq(ops.cos(0.0), 1.0));
+        assert!(approx_eq(ops.tan(0.0), 0.0));
+    }
+
+    #[test]
+    fn standard_operations_degrees() {
+        let ops = StandardScientificOperations {
+            angle_mode: AngleMode::Degrees,
+        };
+        assert!(approx_eq(ops.sin(30.0), 0.5));
+        assert!(approx_eq(ops.cos(60.0), 0.5));
+        assert!(approx_eq(ops.tan(45.0), 1.0));
+    }
+
+    #[test]
+    fn standard_operations_log() {
+        let ops = StandardScientificOperations {
+            angle_mode: AngleMode::Radians,
+        };
+        assert_eq!(ops.log(8.0, 2.0).unwrap(), 3.0);
+        assert!(ops.log(-1.0, 10.0).is_err());
+        assert!(ops.log(10.0, 1.0).is_err());
+        assert!(ops.log(10.0, 0.0).is_err());
+    }
+
+    #[test]
+    fn external_library_adapter_matches_standard_results() {
+        let standard = super::adapter::ExternalLibraryAdapter::new(AngleMode::Degrees);
+        assert!(approx_eq(standard.sin(30.0), 0.5));
+
+        let radians = super::adapter::ExternalLibraryAdapter::new(AngleMode::Radians);
+        assert!(approx_eq(radians.sin(std::f64::consts::PI / 2.0), 1.0));
+        assert_eq!(radians.log(8.0, 2.0).unwrap(), 3.0);
+        assert!(radians.log(-1.0, 2.0).is_err());
+    }
+
+    #[test]
+    fn bridge_console_display_renders() {
+        let display = super::bridge::ConsoleDisplay;
+        display.show_result(42.0);
+        display.show_error("boom");
+        display.show_expression(&NumberExpression::new(7.0));
+    }
+
+    #[test]
+    fn bridge_evaluator_evaluates_and_swaps_strategy() {
+        let multiply = Box::new(BinaryOperation::new(
+            Box::new(NumberExpression::new(3.0)),
+            Box::new(NumberExpression::new(4.0)),
+            Operator::Multiply,
+        ));
+        let add = Box::new(BinaryOperation::new(
+            Box::new(NumberExpression::new(2.0)),
+            multiply,
+            Operator::Add,
+        ));
+        let variables = HashMap::new();
+        let mut evaluator = Evaluator::new(Box::new(StandardEvaluator));
+        assert_eq!(evaluator.evaluate(&*add, &variables).unwrap(), 14.0);
+
+        evaluator.change_strategy(Box::new(StandardEvaluator));
+        assert_eq!(evaluator.evaluate(&*add, &variables).unwrap(), 14.0);
+    }
+}

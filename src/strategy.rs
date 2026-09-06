@@ -496,3 +496,120 @@ pub fn create_scientific_evaluator() -> ExpressionEvaluatorContext {
 
     ExpressionEvaluatorContext::new(evaluation_strategy, precision_strategy)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn recursive_descent() -> Box<dyn EvaluationStrategy> {
+        Box::new(RecursiveDescentStrategy::new(Box::new(SimpleTokenizer)))
+    }
+
+    fn shunting_yard() -> Box<dyn EvaluationStrategy> {
+        Box::new(ShuntingYardStrategy::new(Box::new(SimpleTokenizer)))
+    }
+
+    fn no_vars() -> HashMap<String, f64> {
+        HashMap::new()
+    }
+
+    #[test]
+    fn simple_tokenizer_splits_on_whitespace() {
+        let tokenizer = SimpleTokenizer;
+        let tokens = tokenizer.tokenize("2 + 3").unwrap();
+        assert_eq!(tokens.len(), 3);
+        assert_eq!(tokens[0], Token::number(2.0));
+        assert_eq!(tokens[1], Token::operator(Operator::Add));
+        assert_eq!(tokens[2], Token::number(3.0));
+    }
+
+    #[test]
+    fn simple_tokenizer_rejects_unsplittable_input() {
+        let tokenizer = SimpleTokenizer;
+        assert!(tokenizer.tokenize("2+3").is_err());
+    }
+
+    #[test]
+    fn recursive_descent_strategy_evaluates() {
+        let strategy = recursive_descent();
+        assert_eq!(strategy.evaluate("2 + 3", &no_vars()).unwrap(), 5.0);
+        assert_eq!(strategy.evaluate("3 * 4", &no_vars()).unwrap(), 12.0);
+        assert_eq!(strategy.evaluate("10 - 3 + 1", &no_vars()).unwrap(), 8.0);
+        assert_eq!(strategy.evaluate("sqrt ( 16 )", &no_vars()).unwrap(), 4.0);
+    }
+
+    #[test]
+    fn shunting_yard_strategy_evaluates() {
+        let strategy = shunting_yard();
+        assert_eq!(strategy.evaluate("2 + 3 * 4", &no_vars()).unwrap(), 14.0);
+        assert_eq!(strategy.evaluate("( 1 + 2 ) * 3", &no_vars()).unwrap(), 9.0);
+    }
+
+    #[test]
+    fn shunting_yard_strategy_rejects_missing_operands() {
+        let strategy = shunting_yard();
+        assert!(strategy.evaluate("2 +", &no_vars()).is_err());
+    }
+
+    #[test]
+    fn standard_precision_formats_and_rounds() {
+        let strategy = StandardPrecision::new(2);
+        assert_eq!(strategy.format(1.2345), "1.23");
+        assert_eq!(strategy.round(1.2345), 1.23);
+        assert_eq!(strategy.round(2.5), 2.5);
+    }
+
+    #[test]
+    fn scientific_precision_formats_and_rounds() {
+        let strategy = ScientificPrecision::new(6);
+        assert_eq!(strategy.format(12345.678), "1.23457e4");
+
+        let rounded = strategy.round(12345.678);
+        assert!((rounded - 12345.7).abs() < 1e-9);
+
+        assert_eq!(strategy.round(0.0), 0.0);
+    }
+
+    #[test]
+    fn scientific_precision_rounds_to_significant_figures() {
+        let strategy = ScientificPrecision::new(3);
+        assert_eq!(strategy.round(12345.678), 12300.0);
+        assert_eq!(strategy.round(-12345.678), -12300.0);
+    }
+
+    #[test]
+    fn standard_context_evaluates_and_formats() {
+        let context = create_standard_evaluator();
+        assert_eq!(context.evaluate("2 + 3", &no_vars()).unwrap(), 5.0);
+        assert_eq!(context.format_result(5.0), "5.0000000000");
+    }
+
+    #[test]
+    fn scientific_context_evaluates_and_formats() {
+        let context = create_scientific_evaluator();
+        let result = context.evaluate("1 + 2", &no_vars()).unwrap();
+        assert!((result - 3.0).abs() < 1e-9);
+        assert_eq!(context.format_result(5.0), "5.00000e0");
+    }
+
+    #[test]
+    fn context_can_swap_evaluation_strategy() {
+        let mut context = create_standard_evaluator();
+        context.set_evaluation_strategy(recursive_descent());
+        assert_eq!(context.evaluate("2 + 3", &no_vars()).unwrap(), 5.0);
+    }
+
+    #[test]
+    fn context_can_swap_precision_strategy() {
+        let mut context = create_standard_evaluator();
+        context.set_precision_strategy(Box::new(ScientificPrecision::new(6)));
+        assert_eq!(context.format_result(1.5), "1.50000e0");
+    }
+
+    #[test]
+    fn context_evaluate_applies_precision_rounding() {
+        let mut context = create_standard_evaluator();
+        context.set_precision_strategy(Box::new(StandardPrecision::new(2)));
+        assert_eq!(context.evaluate("1 / 8", &no_vars()).unwrap(), 0.13);
+    }
+}

@@ -79,3 +79,54 @@ impl CalculatorPool {
         Arc::clone(&self.shared_config)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_config_values() {
+        let config = CalculatorConfig::default();
+        assert_eq!(config.precision, 10);
+        assert!(matches!(config.angle_mode, AngleMode::Radians));
+        assert!(matches!(config.notation, NumberFormat::Decimal));
+    }
+
+    #[test]
+    fn scientific_config() {
+        let config = CalculatorConfig::scientific();
+        assert_eq!(config.precision, 15);
+        assert!(matches!(config.angle_mode, AngleMode::Radians));
+        assert!(matches!(config.notation, NumberFormat::Scientific));
+    }
+
+    #[test]
+    fn engineering_config_keeps_defaults_except_notation() {
+        let config = CalculatorConfig::engineering();
+        assert_eq!(config.precision, 10);
+        assert!(matches!(config.angle_mode, AngleMode::Radians));
+        assert!(matches!(config.notation, NumberFormat::Engineering));
+    }
+
+    #[test]
+    fn precision_constants() {
+        assert_eq!(DEFAULT_PRECISION, 10);
+        assert_eq!(MAX_PRECISION, 100);
+    }
+
+    #[test]
+    fn global_config_is_singleton() {
+        let first = get_global_config();
+        let second = get_global_config();
+        assert!(std::ptr::eq(first, second));
+    }
+
+    #[test]
+    fn calculator_pool_shares_config() {
+        let pool = CalculatorPool::new(CalculatorConfig::scientific());
+        let config = pool.get_config();
+        assert_eq!(Arc::strong_count(&config), 2);
+        assert_eq!(config.precision, 15);
+        assert!(matches!(config.notation, NumberFormat::Scientific));
+    }
+}

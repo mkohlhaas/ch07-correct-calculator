@@ -152,3 +152,104 @@ impl Operator {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn factory_methods_create_expected_tokens() {
+        assert_eq!(Token::number(5.0), Token::Number(Number::new(5.0)));
+        assert_eq!(Token::operator(Operator::Power), Token::Operator(Operator::Power));
+        assert_eq!(Token::function(Function::Cos), Token::Function(Function::Cos));
+        assert_eq!(Token::variable("x"), Token::Variable("x".to_string()));
+    }
+
+    #[test]
+    fn scientific_number_uses_scientific_format() {
+        let token = Token::scientific_number(1500.0);
+        assert_eq!(token, Token::Number(Number::with_format(1500.0, NumberFormat::Scientific)));
+    }
+
+    #[test]
+    fn from_str_parses_numbers() {
+        assert_eq!(
+            Token::from_str("42").unwrap(),
+            Token::Number(Number::new(42.0))
+        );
+        let scientific = Token::from_str("1.5e3").unwrap();
+        let Token::Number(num) = scientific else {
+            panic!("expected number token");
+        };
+        assert_eq!(num.value, 1500.0);
+        assert_eq!(num.format, NumberFormat::Scientific);
+    }
+
+    #[test]
+    fn from_str_parses_operators() {
+        assert_eq!(Token::from_str("+").unwrap(), Token::operator(Operator::Add));
+        assert_eq!(Token::from_str("-").unwrap(), Token::operator(Operator::Subtract));
+        assert_eq!(Token::from_str("*").unwrap(), Token::operator(Operator::Multiply));
+        assert_eq!(Token::from_str("/").unwrap(), Token::operator(Operator::Divide));
+        assert_eq!(Token::from_str("^").unwrap(), Token::operator(Operator::Power));
+    }
+
+    #[test]
+    fn from_str_parses_functions_and_parens() {
+        assert_eq!(Token::from_str("sin").unwrap(), Token::function(Function::Sin));
+        assert_eq!(Token::from_str("cos").unwrap(), Token::function(Function::Cos));
+        assert_eq!(Token::from_str("tan").unwrap(), Token::function(Function::Tan));
+        assert_eq!(Token::from_str("sqrt").unwrap(), Token::function(Function::Sqrt));
+        assert_eq!(Token::from_str("(").unwrap(), Token::OpenParen);
+        assert_eq!(Token::from_str(")").unwrap(), Token::CloseParen);
+    }
+
+    #[test]
+    fn from_str_parses_variables() {
+        assert_eq!(Token::from_str("x").unwrap(), Token::variable("x"));
+        assert_eq!(Token::from_str("ans").unwrap(), Token::variable("ans"));
+        assert_eq!(Token::from_str("_tmp").unwrap(), Token::variable("_tmp"));
+    }
+
+    #[test]
+    fn from_str_rejects_invalid_tokens() {
+        assert!(Token::from_str("1+2").is_err());
+        assert!(Token::from_str("x y").is_err());
+    }
+
+    #[test]
+    fn operator_precedence_is_ordered() {
+        assert_eq!(Operator::Add.precedence(), 1);
+        assert_eq!(Operator::Subtract.precedence(), 1);
+        assert_eq!(Operator::Multiply.precedence(), 2);
+        assert_eq!(Operator::Divide.precedence(), 2);
+        assert_eq!(Operator::Power.precedence(), 3);
+    }
+
+    #[test]
+    fn operator_symbols_match() {
+        assert_eq!(Operator::Add.symbol(), "+");
+        assert_eq!(Operator::Subtract.symbol(), "-");
+        assert_eq!(Operator::Multiply.symbol(), "*");
+        assert_eq!(Operator::Divide.symbol(), "/");
+        assert_eq!(Operator::Power.symbol(), "^");
+    }
+
+    #[test]
+    fn number_defaults_to_decimal_format() {
+        assert_eq!(Number::new(3.25).format, NumberFormat::Decimal);
+        assert_eq!(Number::new(3.25).format(), "3.25");
+    }
+
+    #[test]
+    fn number_formats_decimal_scientific_engineering() {
+        let decimal = Number::with_format(1500.0, NumberFormat::Decimal);
+        assert_eq!(decimal.format(), "1500");
+
+        let scientific = Number::with_format(1500.0, NumberFormat::Scientific);
+        assert_eq!(scientific.format(), "1.5e3");
+
+        let engineering = Number::with_format(1500.0, NumberFormat::Engineering);
+        assert_eq!(engineering.format(), "1.5e3");
+    }
+}

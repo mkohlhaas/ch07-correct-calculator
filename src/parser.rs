@@ -170,3 +170,87 @@ impl ExpressionParser {
         Ok(output_queue.pop().unwrap())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    fn eval(expression: &str) -> Result<f64, String> {
+        let parser = ExpressionParser::new();
+        let tree = parser.parse(expression)?;
+        tree.evaluate(&HashMap::new())
+    }
+
+    fn eval_with_vars(expression: &str, values: &[(&str, f64)]) -> Result<f64, String> {
+        let parser = ExpressionParser::new();
+        let tree = parser.parse(expression)?;
+        let variables: HashMap<String, f64> = values
+            .iter()
+            .map(|(k, v)| (k.to_string(), *v))
+            .collect();
+        tree.evaluate(&variables)
+    }
+
+    #[test]
+    fn parses_simple_arithmetic() {
+        assert_eq!(eval("2 + 3").unwrap(), 5.0);
+        assert_eq!(eval("8 - 3").unwrap(), 5.0);
+        assert_eq!(eval("6 * 7").unwrap(), 42.0);
+        assert_eq!(eval("10 / 4").unwrap(), 2.5);
+        assert_eq!(eval("2 ^ 10").unwrap(), 1024.0);
+    }
+
+    #[test]
+    fn parses_operator_precedence() {
+        assert_eq!(eval("2 + 3 * 4").unwrap(), 14.0);
+        assert_eq!(eval("2 * 3 + 4").unwrap(), 10.0);
+        assert_eq!(eval("3 * 4 + 2 * 5").unwrap(), 22.0);
+    }
+
+    #[test]
+    fn parses_parentheses() {
+        assert_eq!(eval("( 1 + 2 ) * 3").unwrap(), 9.0);
+        assert_eq!(eval("2 * ( 3 + 4 )").unwrap(), 14.0);
+        assert_eq!(eval("( 2 + 3 ) * ( 4 + 5 )").unwrap(), 45.0);
+    }
+
+    #[test]
+    fn parses_functions() {
+        assert_eq!(eval("sqrt ( 16 )").unwrap(), 4.0);
+        assert_eq!(eval("sin ( 0 )").unwrap(), 0.0);
+        assert_eq!(eval("cos ( 0 )").unwrap(), 1.0);
+    }
+
+    #[test]
+    fn parses_variables() {
+        assert_eq!(eval_with_vars("x + 1", &[("x", 6.0)]).unwrap(), 7.0);
+        assert_eq!(
+            eval_with_vars("2 * x - 1", &[("x", 5.0)]).unwrap(),
+            9.0
+        );
+    }
+
+    #[test]
+    fn rejects_too_few_operands() {
+        assert_eq!(
+            eval("5 +").unwrap_err(),
+            "Invalid expression: not enough operands"
+        );
+        assert_eq!(
+            eval("2 5").unwrap_err(),
+            "Invalid expression: too many values"
+        );
+    }
+
+    #[test]
+    fn rejects_unbalanced_input() {
+        assert_eq!(eval("( 1 + 2").unwrap_err(), "Mismatched parentheses");
+        assert_eq!(eval("( 1 + 2 ) )").unwrap_err(), "Mismatched parentheses");
+    }
+
+    #[test]
+    fn rejects_unknown_tokens() {
+        assert!(eval("5 @ 3").is_err());
+    }
+}

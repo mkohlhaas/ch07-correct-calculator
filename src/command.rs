@@ -248,3 +248,176 @@ impl CommandProcessor {
         &mut self.calculator
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser::ExpressionParser;
+
+    fn parse(expression: &str) -> Box<dyn Expression> {
+        ExpressionParser::new().parse(expression).unwrap()
+    }
+
+    #[test]
+    fn calculator_default_is_empty() {
+        let calculator = Calculator::default();
+        assert!(calculator.variables.is_empty());
+        assert!(calculator.calc_history.is_empty());
+        assert_eq!(calculator.last_result, None);
+    }
+
+    #[test]
+    fn calculator_manages_variables() {
+        let mut calculator = Calculator::default();
+        assert_eq!(calculator.get_variable("x"), None);
+
+        calculator.set_variable("x", 5.0);
+        assert_eq!(calculator.get_variable("x"), Some(5.0));
+
+        calculator.clear_variable("x");
+        assert_eq!(calculator.get_variable("x"), None);
+    }
+
+    #[test]
+    fn calculator_stores_calculations() {
+        let mut calculator = Calculator::default();
+        calculator.store_calculation("2 + 3".to_string(), 5.0);
+
+        assert_eq!(calculator.last_result, Some(5.0));
+        assert_eq!(calculator.calc_history.len(), 1);
+        assert_eq!(calculator.calc_history[0].expression, "2 + 3");
+        assert_eq!(calculator.calc_history[0].result, 5.0);
+    }
+
+    #[test]
+    fn evaluate_command_executes_and_undoes() {
+        let mut processor = CommandProcessor::default();
+        let command = Box::new(EvaluateCommand::new(
+            "2 + 3".to_string(),
+            parse("2 + 3"),
+        ));
+
+        assert_eq!(processor.execute(command).unwrap(), Some(5.0));
+        assert_eq!(processor.get_calculator().last_result, Some(5.0));
+        assert_eq!(processor.history().len(), 1);
+
+        processor.undo().unwrap();
+        assert_eq!(processor.get_calculator().last_result, None);
+        assert!(processor.history().is_empty());
+    }
+
+    #[test]
+    fn evaluate_command_restores_previous_result_on_undo() {
+        let mut processor = CommandProcessor::default();
+
+        let first = Box::new(EvaluateCommand::new("3 + 4".to_string(), parse("3 + 4")));
+        processor.execute(first).unwrap();
+        assert_eq!(processor.get_calculator().last_result, Some(7.0));
+
+        let second = Box::new(EvaluateCommand::new("10 - 1".to_string(), parse("10 - 1")));
+        processor.execute(second).unwrap();
+        assert_eq!(processor.get_calculator().last_result, Some(9.0));
+
+        processor.undo().unwrap();
+        assert_eq!(processor.get_calculator().last_result, Some(7.0));
+        assert_eq!(processor.get_calculator().calc_history.len(), 1);
+    }
+
+    #[test]
+    fn undo_and_redo_round_trip() {
+        let mut processor = CommandProcessor::default();
+        let command = Box::new(EvaluateCommand::new("7 * 6".to_string(), parse("7 * 6")));
+        processor.execute(command).unwrap();
+
+        processor.undo().unwrap();
+        assert_eq!(processor.get_calculator().last_result, None);
+
+        processor.redo().unwrap();
+        assert_eq!(processor.get_calculator().last_result, Some(42.0));
+        assert_eq!(processor.history().len(), 1);
+    }
+
+    #[test]
+    fn undo_redo_error_when_empty() {
+        let mut processor = CommandProcessor::default();
+        assert_eq!(processor.undo().unwrap_err(), "Nothing to undo");
+        assert_eq!(processor.redo().unwrap_err(), "Nothing to redo");
+    }
+
+    #[test]
+    fn new_command_clears_redo_stack() {
+        let mut processor = CommandProcessor::default();
+        let command = Box::new(EvaluateCommand::new("1 + 1".to_string(), parse("1 + 1")));
+        processor.execute(command).unwrap();
+        processor.undo().unwrap();
+        assert!(processor.redo().is_ok());
+
+        let other = Box::new(EvaluateCommand::new("2 + 2".to_string(), parse("2 + 2")));
+        processor.execute(other).unwrap();
+        assert_eq!(processor.redo().unwrap_err(), "Nothing to redo");
+    }
+
+    #[test]
+    fn set_variable_command_undo_restores_previous_value() {
+        let mut processor = CommandProcessor::default();
+
+        let set = Box::new(SetVariableCommand::new("x".to_string(), 5.0));
+        processor.execute(set).unwrap();
+        assert_eq!(processor.get_calculator().get_variable("x"), Some(5.0));
+
+        let overwrite = Box::new(SetVariableCommand::new("x".to_string(), 9.0));
+        processor.execute(overwrite).unwrap();
+        assert_eq!(processor.get_calculator().get_variable("x"), Some(9.0));
+
+        processor.undo().unwrap();
+        assert_eq!(processor.get_calculator().get_variable("x"), Some(5.0));
+    }
+
+    #[test]
+    fn set_variable_command_undo_removes_new_variable() {
+        let mut processor = CommandProcessor::default();
+        let set = Box::new(SetVariableCommand::new("x".to_string(), 5.0));
+        processor.execute(set).unwrap();
+
+        processor.undo().unwrap();
+        assert_eq!(processor.get_calculator().get_variable("x"), None);
+    }
+
+    #[test]
+    fn clear_variables_command_undo_restores_state() {
+        let mut processor = CommandProcessor::default();
+        processor.get_calculator_mut().set_variable("x", 5.0);
+        processor.get_calculator_mut().set_variable("y", 6.0);
+
+        let clear = Box::new(ClearVariablesCommand::new());
+        processor.execute(clear).unwrap();
+        assert!(processor.get_calculator().variables.is_empty());
+
+        processor.undo().unwrap();
+        assert_eq!(processor.get_calculator().get_variable("x"), Some(5.0));
+        assert_eq!(processor.get_calculator().get_variable("y"), Some(6.0));
+    }
+
+    #[test]
+    fn history_records_descriptions() {
+        let mut processor = CommandProcessor::default();
+        processor
+            .execute(Box::new(EvaluateCommand::new("2 + 3".to_string(), parse("2 + 3"))))
+            .unwrap();
+        processor
+            .execute(Box::new(SetVariableCommand::new("x".to_string(), 5.0)))
+            .unwrap();
+
+        let history = processor.history();
+        assert_eq!(history.len(), 2);
+        assert_eq!(history[0], "Evaluate: 2 + 3");
+        assert_eq!(history[1], "Set: x = 5");
+    }
+
+    #[test]
+    fn command_execution_with_undefined_variable_fails() {
+        let mut processor = CommandProcessor::default();
+        let command = Box::new(EvaluateCommand::new("x + 1".to_string(), parse("x + 1")));
+        assert_eq!(processor.execute(command).unwrap_err(), "Undefined variable: x");
+    }
+}
