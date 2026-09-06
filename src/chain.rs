@@ -125,11 +125,23 @@ impl InputHandler for CommandHandler {
                     }
                     Ok(None)
                 }
+                "calcs" => {
+                    let calcs = &processor.get_calculator().calc_history;
+                    if calcs.is_empty() {
+                        println!("(no calculations yet)");
+                    } else {
+                        for (i, calc) in calcs.iter().enumerate() {
+                            println!("{}: {} = {}", i + 1, calc.expression, calc.result);
+                        }
+                    }
+                    Ok(None)
+                }
                 "help" => {
                     println!("Calculator commands:");
                     println!("  /undo - Undo last operation");
                     println!("  /redo - Redo last undone operation");
                     println!("  /history - Show command history");
+                    println!("  /calcs - Show calculation history");
                     println!("  /clear - Clear all variables");
                     println!("  /vars - Show all current variables");
                     println!("  /help - Show this help");
@@ -344,6 +356,18 @@ mod tests {
 
         assert_eq!(chain.handle("/history", &mut processor).unwrap(), None);
         assert_eq!(processor.history().len(), 2);
+    }
+
+    #[test]
+    fn calcs_command_reports_calculations() {
+        let mut processor = CommandProcessor::default();
+        let chain = chain();
+
+        chain.handle("2 + 3", &mut processor).unwrap();
+        chain.handle("x = 5", &mut processor).unwrap();
+
+        assert_eq!(chain.handle("/calcs", &mut processor).unwrap(), None);
+        assert_eq!(processor.get_calculator().calc_history.len(), 1);
     }
 
     #[test]
