@@ -202,6 +202,7 @@ fn main() {
         println!("  1. Command Processor");
         println!("  2. Mediator");
         println!("  3. Template Method");
+        println!("  4. Strategy");
         println!("  exit to quit");
         print!("> ");
         io::stdout().flush().unwrap();
@@ -215,6 +216,7 @@ fn main() {
             "1" | "command" => run_with_command_processor(),
             "2" | "mediator" => run_with_mediator(),
             "3" | "template" => run_with_template(),
+            "4" | "strategy" => run_with_strategy(),
             "exit" => break,
             _ => {
                 println!("Invalid choice, please try again");
