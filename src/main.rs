@@ -265,8 +265,6 @@ fn run_with_command_processor() {
 // Example using the Mediator pattern
 fn run_with_mediator() {
     println!("Correct Calculator with Mediator");
-    println!("Type expressions to evaluate, variables to set (x = 5),");
-    println!("or commands (/help, /undo, /redo, /history, /clear, /exit)");
 
     // Create mediator system
     let mediator = mediator::create_mediator_system();
@@ -330,8 +328,6 @@ fn run_with_mediator() {
 // Example using the Template Method pattern
 fn run_with_template() {
     println!("Correct Calculator with Template Method");
-    println!("Type expressions to evaluate, variables to set (x = 5),");
-    println!("or commands (/help, /undo, /redo, /history, /clear, /exit)");
 
     // Create evaluator using template method
     let evaluator = template::create_evaluator(true); // true for recursive descent
