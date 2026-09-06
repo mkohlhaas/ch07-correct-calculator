@@ -194,7 +194,6 @@ use std::io::{self, Write};
 
 fn main() {
     println!("Correct Calculator - Chapter 7");
-    println!("Choose which calculator to run:");
 
     loop {
         println!("Choose which calculator to run:");
@@ -227,8 +226,8 @@ fn main() {
 // Example using the Command Processor pattern
 fn run_with_command_processor() {
     println!("Correct Calculator with Command Processor");
-    println!("Type expressions to evaluate, variables to set (x = 5),");
-    println!("or commands (/help, /undo, /redo, /history, /vars, /clear, /exit)");
+    println!("Type expressions to evaluate, variables to set (x = 5), or commands.");
+    println!("Use /help to show all commands.");
 
     // Set up the calculator components (combining Ch6 & Ch7 patterns)
     let input_chain = create_input_chain();
@@ -251,7 +250,7 @@ fn run_with_command_processor() {
             break;
         }
 
-        // do the calculator stuff
+        // CommandHandler will be passed a CommandProcessor
         match input_chain.handle(input, &mut processor) {
             Ok(Some(result)) => println!("= {}", result),
             Ok(None) => {} // Command executed with no result to display
