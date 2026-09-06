@@ -7,6 +7,15 @@ use std::{collections::HashMap, time::SystemTime};
 // 1. The Receiver: Holds the application state //
 // ============================================ //
 
+// Helper struct: Represents a complete calculation
+#[derive(Debug, Clone)]
+pub struct Calculation {
+    pub expression: String,
+    pub result: f64,
+    pub timestamp: SystemTime,
+}
+
+// the receiver
 #[derive(Default)]
 pub struct Calculator {
     pub variables: HashMap<String, f64>,
@@ -40,14 +49,6 @@ impl Calculator {
         self.calc_history.push(calculation);
         self.last_result = Some(result);
     }
-}
-
-// Helper struct: Represents a complete calculation
-#[derive(Debug, Clone)]
-pub struct Calculation {
-    pub expression: String,
-    pub result: f64,
-    pub timestamp: SystemTime,
 }
 
 // =============================================== //
@@ -205,7 +206,6 @@ pub struct CommandProcessor {
 }
 
 impl CommandProcessor {
-
     pub fn execute(&mut self, mut command: Box<dyn Command>) -> Result<Option<f64>, String> {
         let result = command.execute(&mut self.calculator)?;
         self.cmd_history.push(command);
@@ -292,10 +292,7 @@ mod tests {
     #[test]
     fn evaluate_command_executes_and_undoes() {
         let mut processor = CommandProcessor::default();
-        let command = Box::new(EvaluateCommand::new(
-            "2 + 3".to_string(),
-            parse("2 + 3"),
-        ));
+        let command = Box::new(EvaluateCommand::new("2 + 3".to_string(), parse("2 + 3")));
 
         assert_eq!(processor.execute(command).unwrap(), Some(5.0));
         assert_eq!(processor.get_calculator().last_result, Some(5.0));
@@ -402,7 +399,10 @@ mod tests {
     fn history_records_descriptions() {
         let mut processor = CommandProcessor::default();
         processor
-            .execute(Box::new(EvaluateCommand::new("2 + 3".to_string(), parse("2 + 3"))))
+            .execute(Box::new(EvaluateCommand::new(
+                "2 + 3".to_string(),
+                parse("2 + 3"),
+            )))
             .unwrap();
         processor
             .execute(Box::new(SetVariableCommand::new("x".to_string(), 5.0)))
@@ -418,6 +418,9 @@ mod tests {
     fn command_execution_with_undefined_variable_fails() {
         let mut processor = CommandProcessor::default();
         let command = Box::new(EvaluateCommand::new("x + 1".to_string(), parse("x + 1")));
-        assert_eq!(processor.execute(command).unwrap_err(), "Undefined variable: x");
+        assert_eq!(
+            processor.execute(command).unwrap_err(),
+            "Undefined variable: x"
+        );
     }
 }
