@@ -198,9 +198,11 @@ fn main() {
     println!("Choose which calculator to run:");
 
     loop {
+        println!("Choose which calculator to run:");
         println!("  1. Command Processor");
         println!("  2. Mediator");
         println!("  3. Template Method");
+        println!("  exit to quit");
         print!("> ");
         io::stdout().flush().unwrap();
 
@@ -210,18 +212,9 @@ fn main() {
         }
 
         match input.trim() {
-            "1" | "command" => {
-                run_with_command_processor();
-                break;
-            }
-            "2" | "mediator" => {
-                run_with_mediator();
-                break;
-            }
-            "3" | "template" => {
-                run_with_template();
-                break;
-            }
+            "1" | "command" => run_with_command_processor(),
+            "2" | "mediator" => run_with_mediator(),
+            "3" | "template" => run_with_template(),
             "exit" => break,
             _ => {
                 println!("Invalid choice, please try again");
