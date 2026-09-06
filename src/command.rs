@@ -12,7 +12,7 @@ use std::{collections::HashMap, time::SystemTime};
 pub struct Calculation {
     pub expression: String,
     pub result: f64,
-    pub timestamp: SystemTime,
+    pub timestamp: SystemTime, // not used anywhere so far
 }
 
 // the receiver
