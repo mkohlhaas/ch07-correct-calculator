@@ -8,7 +8,6 @@
 
 use crate::command::{
     ClearVariablesCommand, Command, CommandProcessor, EvaluateCommand, SetVariableCommand,
-    ShowVariablesCommand,
 };
 use crate::parser::ExpressionParser;
 
@@ -114,8 +113,17 @@ impl InputHandler for CommandHandler {
                     processor.execute(command)
                 }
                 "vars" => {
-                    let command = Box::new(ShowVariablesCommand::new());
-                    processor.execute(command)
+                    let mut vars: Vec<_> = processor.get_calculator().variables.iter().collect();
+                    vars.sort_by(|a, b| a.0.cmp(b.0));
+
+                    if vars.is_empty() {
+                        println!("(no variables defined)");
+                    } else {
+                        for (name, value) in vars {
+                            println!("{} = {}", name, value);
+                        }
+                    }
+                    Ok(None)
                 }
                 "help" => {
                     println!("Calculator commands:");
@@ -323,6 +331,7 @@ mod tests {
         chain.handle("x = 5", &mut processor).unwrap();
         assert_eq!(chain.handle("/vars", &mut processor).unwrap(), None);
         assert_eq!(processor.get_calculator().get_variable("x"), Some(5.0));
+        assert_eq!(processor.history().len(), 1);
     }
 
     #[test]
