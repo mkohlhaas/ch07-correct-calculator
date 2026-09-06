@@ -201,20 +201,20 @@ impl Command for ClearVariablesCommand {
 #[derive(Default)]
 pub struct CommandProcessor {
     calculator: Calculator,
-    cmd_history: Vec<Box<dyn Command>>, // executed, undoable commands (undo source)
-    redo_stack: Vec<Box<dyn Command>>,  // undone commands pending re-application (redo source)
+    undo_stack: Vec<Box<dyn Command>>, // executed, undoable commands
+    redo_stack: Vec<Box<dyn Command>>, // undone commands pending re-application
 }
 
 impl CommandProcessor {
     pub fn execute(&mut self, mut command: Box<dyn Command>) -> Result<Option<f64>, String> {
         let result = command.execute(&mut self.calculator)?;
-        self.cmd_history.push(command);
+        self.undo_stack.push(command);
         self.redo_stack.clear(); // Clear redo stack after new command
         Ok(result)
     }
 
     pub fn undo(&mut self) -> Result<(), String> {
-        if let Some(command) = self.cmd_history.pop() {
+        if let Some(command) = self.undo_stack.pop() {
             command.undo(&mut self.calculator)?;
             self.redo_stack.push(command);
             Ok(())
@@ -226,7 +226,7 @@ impl CommandProcessor {
     pub fn redo(&mut self) -> Result<(), String> {
         if let Some(mut command) = self.redo_stack.pop() {
             command.execute(&mut self.calculator)?;
-            self.cmd_history.push(command);
+            self.undo_stack.push(command);
             Ok(())
         } else {
             Err("Nothing to redo".to_string())
@@ -234,7 +234,7 @@ impl CommandProcessor {
     }
 
     pub fn history(&self) -> Vec<String> {
-        self.cmd_history
+        self.undo_stack
             .iter()
             .map(|cmd| cmd.description())
             .collect()

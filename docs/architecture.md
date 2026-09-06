@@ -48,7 +48,7 @@ inline modules (in main.rs, used by tests only):
 ### Command (command.rs)
 
 ```
-Client            : CommandProcessor { calculator, cmd_history: Vec<Box<dyn Command>>,
+Client            : CommandProcessor { calculator,                                        undo_stack: Vec<Box<dyn Command>>,
                                        redo_stack: Vec<Box<dyn Command>> }
 Command interface : trait Command { execute(), undo(), description() }
                      |-- EvaluateCommand { expression, expr_tree: Box<dyn Expression>,
