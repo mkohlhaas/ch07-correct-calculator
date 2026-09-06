@@ -195,7 +195,44 @@ use std::io::{self, Write};
 
 fn main() {
     println!("Correct Calculator - Chapter 7");
-    println!("Incorporating structural patterns from Chapter 6");
+    println!("Choose which calculator to run:");
+
+    loop {
+        println!("  1. Command Processor");
+        println!("  2. Mediator");
+        println!("  3. Template Method");
+        print!("> ");
+        io::stdout().flush().unwrap();
+
+        let mut input = String::new();
+        if io::stdin().read_line(&mut input).is_err() {
+            continue;
+        }
+
+        match input.trim() {
+            "1" | "command" => {
+                run_with_command_processor();
+                break;
+            }
+            "2" | "mediator" => {
+                run_with_mediator();
+                break;
+            }
+            "3" | "template" => {
+                run_with_template();
+                break;
+            }
+            "exit" => break,
+            _ => {
+                println!("Invalid choice, please try again");
+            }
+        }
+    }
+}
+
+// Example using the Command Processor pattern
+fn run_with_command_processor() {
+    println!("Correct Calculator with Command Processor");
     println!("Type expressions to evaluate, variables to set (x = 5),");
     println!("or commands (/help, /undo, /redo, /history, /clear, /exit)");
 
@@ -235,6 +272,8 @@ fn main() {
 // Example using the Mediator pattern
 fn run_with_mediator() {
     println!("Correct Calculator with Mediator");
+    println!("Type expressions to evaluate, variables to set (x = 5),");
+    println!("or commands (/help, /undo, /redo, /history, /clear, /exit)");
 
     // Create mediator system
     let mediator = mediator::create_mediator_system();
@@ -298,6 +337,8 @@ fn run_with_mediator() {
 // Example using the Template Method pattern
 fn run_with_template() {
     println!("Correct Calculator with Template Method");
+    println!("Type expressions to evaluate, variables to set (x = 5),");
+    println!("or commands (/help, /undo, /redo, /history, /clear, /exit)");
 
     // Create evaluator using template method
     let evaluator = template::create_evaluator(true); // true for recursive descent
