@@ -208,23 +208,20 @@ fn main() {
         print!("> ");
         io::stdout().flush().unwrap();
 
+        // read input
         let mut input = String::new();
         if io::stdin().read_line(&mut input).is_err() {
             println!("Error reading input, please try again");
             continue;
         }
 
+        // check if user wants to exit
         let input = input.trim();
         if input == "/exit" {
             break;
         }
 
-        // Add demo command to show Ch6 structural patterns
-        if input == "/demo_ch6" {
-            demonstrate_ch6_patterns();
-            continue;
-        }
-
+        // do the calculator stuff
         match input_chain.handle(input, &mut processor) {
             Ok(Some(result)) => println!("= {}", result),
             Ok(None) => {} // Command executed with no result to display
@@ -233,66 +230,6 @@ fn main() {
     }
 
     println!("Goodbye!");
-}
-
-// Demonstration of Chapter 6 structural patterns
-fn demonstrate_ch6_patterns() {
-    use adapter::{ScientificOperations, StandardScientificOperations};
-    use bridge::{ConsoleDisplay, Display, EvaluationStrategy, Evaluator, StandardEvaluator};
-    use config::AngleMode;
-    use expression::{
-        BinaryOperation, Expression, FunctionCall, NumberExpression, VariableExpression,
-    };
-    use std::collections::HashMap;
-    use token::{Function, Operator};
-
-    println!("\n== Demonstrating Chapter 6 Structural Patterns ==");
-
-    // Composite pattern demo
-    println!("\n-- Composite Pattern --");
-    // Build expression: 2 + 3 * 4
-    let multiply = Box::new(BinaryOperation::new(
-        Box::new(NumberExpression::new(3.0)),
-        Box::new(NumberExpression::new(4.0)),
-        Operator::Multiply,
-    ));
-
-    let add = Box::new(BinaryOperation::new(
-        Box::new(NumberExpression::new(2.0)),
-        multiply,
-        Operator::Add,
-    ));
-
-    let variables = HashMap::new();
-    println!("Expression: {}", add.to_string());
-    match add.evaluate(&variables) {
-        Ok(result) => println!("Result: {}", result),
-        Err(e) => println!("Error: {}", e),
-    }
-
-    // Adapter pattern demo
-    println!("\n-- Adapter Pattern --");
-    let sci_ops = StandardScientificOperations {
-        angle_mode: AngleMode::Radians,
-    };
-    println!("sin(π/2) = {}", sci_ops.sin(std::f64::consts::PI / 2.0));
-
-    // Bridge pattern demo
-    println!("\n-- Bridge Pattern --");
-    let display = ConsoleDisplay;
-    display.show_result(14.0);
-
-    // Create evaluator with standard strategy
-    println!("\n-- Evaluator Bridge --");
-    let evaluator = Evaluator::new(Box::new(StandardEvaluator));
-
-    // Use the evaluator
-    match evaluator.evaluate(&*add, &variables) {
-        Ok(result) => println!("Result: {}", result),
-        Err(e) => println!("Error: {}", e),
-    }
-
-    println!("\n== End of Chapter 6 Patterns Demonstration ==");
 }
 
 // Example using the Mediator pattern
