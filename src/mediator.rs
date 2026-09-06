@@ -58,50 +58,31 @@ pub trait CalculatorMediator: Send + Sync {
 // 1. Define the components //
 // //////////////////////// //
 
-// All components have a `mediator` field.
-
 // ====================== //
 // A. EvaluationComponent //
 // ====================== //
 
-// Component that handles evaluation
+// Component that handles evaluation. It is passive: the mediator hands it the expression and the
+// current variables, and it returns the result. It never touches the mediator itself, which keeps the
+// mediator from deadlocking when it calls back into its own components.
 pub struct EvaluationComponent {
-    // Arc provides shared ownership so multiple components can hold references. Mutex ensures safe
-    // mutable access. Only one component can interact with the mediator at a time. The dyn keyword
-    // indicates a trait object, enabling runtime polymorphism if we need different mediator
-    // implementations.
-    mediator: Arc<Mutex<dyn CalculatorMediator>>,
     parser: crate::parser::ExpressionParser,
 }
 
 impl EvaluationComponent {
-    pub fn new(mediator: Arc<Mutex<dyn CalculatorMediator>>) -> Self {
+    pub fn new() -> Self {
         Self {
-            mediator,
             parser: crate::parser::ExpressionParser::new(),
         }
     }
 
-    pub fn evaluate(&self, expression: &str) -> Result<f64, String> {
-        // Parse expression
+    pub fn evaluate(
+        &self,
+        expression: &str,
+        variables: &HashMap<String, f64>,
+    ) -> Result<f64, String> {
         let expr = self.parser.parse(expression)?;
-
-        // Get variables from mediator
-        let variables = {
-            let mediator = self.mediator.lock().unwrap();
-            mediator.get_all_variables()
-        };
-
-        // Evaluate
-        let result = expr.evaluate(&variables)?;
-
-        // Notify mediator of result
-        {
-            let mut mediator = self.mediator.lock().unwrap();
-            mediator.notify("evaluator", CalculatorEvent::ResultComputed(result));
-        }
-
-        Ok(result)
+        expr.evaluate(variables)
     }
 }
 
@@ -109,29 +90,20 @@ impl EvaluationComponent {
 // B. VariableStorage //
 // ================== //
 
-// Component that manages variables
+// Component that manages variables.
 pub struct VariableStorage {
-    mediator: Arc<Mutex<dyn CalculatorMediator>>,
     variables: HashMap<String, f64>,
 }
 
 impl VariableStorage {
-    pub fn new(mediator: Arc<Mutex<dyn CalculatorMediator>>) -> Self {
+    pub fn new() -> Self {
         Self {
-            mediator,
             variables: HashMap::new(),
         }
     }
 
     pub fn set_variable(&mut self, name: &str, value: f64) {
         self.variables.insert(name.to_string(), value);
-
-        // Notify mediator
-        let mut mediator = self.mediator.lock().unwrap();
-        mediator.notify(
-            "variables",
-            CalculatorEvent::VariableChanged(name.to_string(), value),
-        );
     }
 
     pub fn get_variable(&self, name: &str) -> Option<f64> {
@@ -160,13 +132,11 @@ pub trait Display: Send + Sync {
 }
 
 // Console display component
-pub struct ConsoleDisplay {
-    mediator: Arc<Mutex<dyn CalculatorMediator>>,
-}
+pub struct ConsoleDisplay;
 
 impl ConsoleDisplay {
-    pub fn new(mediator: Arc<Mutex<dyn CalculatorMediator>>) -> Self {
-        Self { mediator }
+    pub fn new() -> Self {
+        Self
     }
 }
 
@@ -239,6 +209,7 @@ impl CalculatorMediatorImpl {
 
 impl CalculatorMediator for CalculatorMediatorImpl {
     fn notify(&mut self, sender: &str, event: CalculatorEvent) {
+        let _ = sender;
         match event {
             CalculatorEvent::ResultComputed(result) => {
                 self.last_result = Some(result);
@@ -302,14 +273,28 @@ impl CalculatorMediator for CalculatorMediatorImpl {
             let mut variables = variables.lock().unwrap();
             variables.set_variable(name, value);
         }
+
+        self.notify(
+            "variables",
+            CalculatorEvent::VariableChanged(name.to_string(), value),
+        );
     }
 
     fn evaluate(&mut self, expression: &str) -> Result<f64, String> {
-        if let Some(evaluator) = &self.evaluator {
-            evaluator.evaluate(expression)
-        } else {
-            Err("Evaluator not initialized".to_string())
-        }
+        let evaluator = self
+            .evaluator
+            .as_ref()
+            .ok_or_else(|| "Evaluator not initialized".to_string())?;
+
+        let variables = self.get_all_variables();
+        let result = evaluator.evaluate(expression, &variables)?;
+
+        self.notify(
+            "evaluator",
+            CalculatorEvent::ResultComputed(result),
+        );
+
+        Ok(result)
     }
 
     fn change_angle_mode(&mut self, mode: AngleMode) {
@@ -332,17 +317,12 @@ pub fn create_mediator_system() -> Arc<Mutex<CalculatorMediatorImpl>> {
     // Create mediator as a concrete type
     let mediator = Arc::new(Mutex::new(CalculatorMediatorImpl::new()));
 
-    // Create components
-    let evaluator = Arc::new(EvaluationComponent::new(mediator.clone()));
-    let variables = Arc::new(Mutex::new(VariableStorage::new(mediator.clone())));
-    let display = Arc::new(Mutex::new(ConsoleDisplay::new(mediator.clone())));
-
-    // Register components with mediator
+    // Create components and register them with the mediator
     {
         let mut mediator_lock = mediator.lock().unwrap();
-        mediator_lock.set_evaluator(evaluator);
-        mediator_lock.set_variables(variables);
-        mediator_lock.set_display(display);
+        mediator_lock.set_evaluator(Arc::new(EvaluationComponent::new()));
+        mediator_lock.set_variables(Arc::new(Mutex::new(VariableStorage::new())));
+        mediator_lock.set_display(Arc::new(Mutex::new(ConsoleDisplay::new())));
     }
 
     mediator
@@ -355,81 +335,66 @@ mod tests {
     use std::collections::HashMap;
 
     #[derive(Default)]
-    struct MockMediator {
-        events: Mutex<Vec<String>>,
-        variables: Mutex<HashMap<String, f64>>,
+    struct TestDisplay {
+        messages: Mutex<Vec<String>>,
     }
 
-    impl CalculatorMediator for MockMediator {
-        fn notify(&mut self, sender: &str, event: CalculatorEvent) {
-            let description = match event {
-                CalculatorEvent::ResultComputed(result) => format!("result:{}", result),
-                CalculatorEvent::VariableChanged(name, value) => {
-                    format!("var:{}={}", name, value)
-                }
-                CalculatorEvent::ModeChanged(mode) => format!("mode:{}", mode),
-                CalculatorEvent::DisplayUpdate(message) => format!("display:{}", message),
-                CalculatorEvent::ErrorOccurred(error) => format!("error:{}", error),
-            };
-            self.events.lock().unwrap().push(format!("{}->{}", sender, description));
+    impl Display for TestDisplay {
+        fn show_result(&mut self, result: f64) {
+            self.messages.lock().unwrap().push(format!("result:{}", result));
         }
 
-        fn get_result(&self) -> Option<f64> {
-            None
+        fn show_message(&mut self, message: &str) {
+            self.messages.lock().unwrap().push(format!("msg:{}", message));
         }
 
-        fn get_variable(&self, name: &str) -> Option<f64> {
-            self.variables.lock().unwrap().get(name).copied()
+        fn show_error(&mut self, error: &str) {
+            self.messages.lock().unwrap().push(format!("err:{}", error));
         }
 
-        fn get_all_variables(&self) -> HashMap<String, f64> {
-            self.variables.lock().unwrap().clone()
-        }
-
-        fn set_variable(&mut self, name: &str, value: f64) {
-            self.variables.lock().unwrap().insert(name.to_string(), value);
-        }
-
-        fn evaluate(&mut self, _expression: &str) -> Result<f64, String> {
-            Err("Mock mediator cannot evaluate".to_string())
-        }
-
-        fn change_angle_mode(&mut self, _mode: AngleMode) {
-            self.events.lock().unwrap().push("change_angle_mode".to_string());
+        fn clear(&mut self) {
+            self.messages.lock().unwrap().clear();
         }
     }
 
-    // Components hold a *mock* mediator so that locking the real mediator does not deadlock
-    // (std Mutex is not reentrant).
-    fn setup() -> (Arc<Mutex<CalculatorMediatorImpl>>, Arc<Mutex<MockMediator>>) {
-        let real = Arc::new(Mutex::new(CalculatorMediatorImpl::new()));
-        let mock = Arc::new(Mutex::new(MockMediator::default()));
-        let mock_dyn: Arc<Mutex<dyn CalculatorMediator>> = mock.clone();
-
-        let evaluator = Arc::new(EvaluationComponent::new(mock_dyn.clone()));
-        let variables = Arc::new(Mutex::new(VariableStorage::new(mock_dyn.clone())));
-        let display = Arc::new(Mutex::new(ConsoleDisplay::new(mock_dyn.clone())));
+    fn setup() -> (Arc<Mutex<CalculatorMediatorImpl>>, Arc<Mutex<TestDisplay>>) {
+        let mediator = Arc::new(Mutex::new(CalculatorMediatorImpl::new()));
+        let display = Arc::new(Mutex::new(TestDisplay::default()));
 
         {
-            let mut mediator = real.lock().unwrap();
-            mediator.set_evaluator(evaluator);
-            mediator.set_variables(variables);
-            mediator.set_display(display);
+            let mut mediator = mediator.lock().unwrap();
+            mediator.set_evaluator(Arc::new(EvaluationComponent::new()));
+            mediator.set_variables(Arc::new(Mutex::new(VariableStorage::new())));
+            mediator.set_display(display.clone());
         }
 
-        (real, mock)
+        (mediator, display)
     }
 
     #[test]
     fn mediator_evaluates_expressions() {
-        let (mediator, mock) = setup();
+        let (mediator, display) = setup();
 
         let result = mediator.lock().unwrap().evaluate("2 + 3").unwrap();
         assert_eq!(result, 5.0);
+        assert_eq!(mediator.lock().unwrap().get_result(), Some(5.0));
 
-        let mock_guard = mock.lock().unwrap();
-        let events = mock_guard.events.lock().unwrap();
-        assert!(events.contains(&"evaluator->result:5".to_string()));
+        let display = display.lock().unwrap();
+        let messages = display.messages.lock().unwrap();
+        assert!(messages.contains(&"result:5".to_string()));
+    }
+
+    #[test]
+    fn mediator_evaluates_expressions_with_variables() {
+        let (mediator, _display) = setup();
+
+        {
+            let mut mediator = mediator.lock().unwrap();
+            mediator.set_variable("x", 4.0);
+        }
+
+        let result = mediator.lock().unwrap().evaluate("x + 1").unwrap();
+        assert_eq!(result, 5.0);
     }
 
     #[test]
@@ -443,7 +408,7 @@ mod tests {
 
     #[test]
     fn mediator_manages_variables() {
-        let (mediator, mock) = setup();
+        let (mediator, display) = setup();
 
         {
             let mut mediator = mediator.lock().unwrap();
@@ -452,28 +417,15 @@ mod tests {
             assert_eq!(mediator.get_all_variables().get("x"), Some(&5.0));
         }
 
-        let mock_guard = mock.lock().unwrap();
-        let events = mock_guard.events.lock().unwrap();
-        assert!(events.contains(&"variables->var:x=5".to_string()));
+        let display = display.lock().unwrap();
+        let messages = display.messages.lock().unwrap();
+        assert!(messages.contains(&"msg:Variable x set to 5".to_string()));
     }
 
     #[test]
     fn mediator_returns_none_for_unset_variables() {
         let mediator = Arc::new(Mutex::new(CalculatorMediatorImpl::new()));
         assert_eq!(mediator.lock().unwrap().get_variable("x"), None);
-    }
-
-    #[test]
-    fn mediator_derives_variable_expressions() {
-        let (mediator, _mock) = setup();
-
-        {
-            let mut mediator = mediator.lock().unwrap();
-            mediator.set_variable("x", 4.0);
-        }
-
-        let result = mediator.lock().unwrap().evaluate("6 * 7").unwrap();
-        assert_eq!(result, 42.0);
     }
 
     #[test]
