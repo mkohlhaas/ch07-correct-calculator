@@ -10,7 +10,9 @@ use std::collections::HashMap;
 
 // Abstract base class defining template method
 pub trait ExpressionEvaluator {
+    // -------------------------------------------------------- //
     // A. The Template Method: This controls the fixed workflow //
+    // -------------------------------------------------------- //
 
     // workflow: tokenize -> validate -> parse -> evaluate
     fn evaluate(&self, expression: &str, variables: &HashMap<String, f64>) -> Result<f64, String> {
@@ -27,7 +29,9 @@ pub trait ExpressionEvaluator {
         self.evaluate_parsed(parsed, variables)
     }
 
+    // ---------------------------------------------- //
     // B. Shared default behavior for invariant steps //
+    // ---------------------------------------------- //
 
     fn tokenize(&self, expression: &str) -> Result<Vec<Token>, String> {
         // Default tokenization implementation
@@ -67,7 +71,9 @@ pub trait ExpressionEvaluator {
         Ok(())
     }
 
+    // -------------------------------------------------------- //
     // C. Abstract methods: Concrete types must implement these //
+    // -------------------------------------------------------- //
 
     fn parse(&self, tokens: Vec<Token>) -> Result<Box<dyn Expression>, String>;
 
@@ -77,6 +83,10 @@ pub trait ExpressionEvaluator {
         variables: &HashMap<String, f64>,
     ) -> Result<f64, String>;
 }
+
+// =========================== //
+// Recursive Descent Evaluator //
+// =========================== //
 
 // Concrete implementation using recursive descent
 pub struct RecursiveDescentEvaluator;
@@ -234,6 +244,10 @@ impl ExpressionEvaluator for RecursiveDescentEvaluator {
     }
 }
 
+// ======================= //
+// Shunting-Yard Evaluator //
+// ======================= //
+
 // Concrete implementation using shunting yard algorithm
 pub struct ShuntingYardEvaluator;
 
@@ -353,10 +367,8 @@ mod tests {
         expression: &str,
         variables: &[(&str, f64)],
     ) -> Result<f64, String> {
-        let vars: HashMap<String, f64> = variables
-            .iter()
-            .map(|(k, v)| (k.to_string(), *v))
-            .collect();
+        let vars: HashMap<String, f64> =
+            variables.iter().map(|(k, v)| (k.to_string(), *v)).collect();
         evaluator.evaluate(expression, &vars)
     }
 
@@ -411,10 +423,16 @@ mod tests {
     #[test]
     fn mismatched_parentheses_are_rejected() {
         let recursive = create_evaluator(true);
-        assert_eq!(eval(&*recursive, "( 1 + 2").unwrap_err(), "Mismatched parentheses");
+        assert_eq!(
+            eval(&*recursive, "( 1 + 2").unwrap_err(),
+            "Mismatched parentheses"
+        );
 
         let shunting_yard = create_evaluator(false);
-        assert_eq!(eval(&*shunting_yard, "( 1 + 2").unwrap_err(), "Unbalanced parenthesis");
+        assert_eq!(
+            eval(&*shunting_yard, "( 1 + 2").unwrap_err(),
+            "Unbalanced parenthesis"
+        );
     }
 
     #[test]
@@ -429,7 +447,10 @@ mod tests {
     #[test]
     fn recursive_descent_rejects_undefined_variables() {
         let evaluator = create_evaluator(true);
-        assert_eq!(eval(&*evaluator, "x + 1").unwrap_err(), "Undefined variable: x");
+        assert_eq!(
+            eval(&*evaluator, "x + 1").unwrap_err(),
+            "Undefined variable: x"
+        );
     }
 
     #[test]
