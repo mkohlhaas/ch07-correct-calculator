@@ -190,7 +190,10 @@ mod adapter {
 use chain::{InputHandler, create_input_chain};
 use command::CommandProcessor;
 use mediator::CalculatorMediator;
-use std::io::{self, Write};
+use std::{
+    collections::HashMap,
+    io::{self, Write},
+};
 
 fn main() {
     println!("Correct Calculator - Chapter 7");
@@ -223,7 +226,6 @@ fn main() {
     }
 }
 
-// Example using the Command Processor pattern
 fn run_with_command_processor() {
     println!("Correct Calculator with Command Processor");
     println!("Type expressions to evaluate, variables to set (x = 5), or commands.");
@@ -261,7 +263,6 @@ fn run_with_command_processor() {
     println!("Goodbye!");
 }
 
-// Example using the Mediator pattern
 fn run_with_mediator() {
     println!("Correct Calculator with Mediator");
 
@@ -324,14 +325,13 @@ fn run_with_mediator() {
     println!("Goodbye!");
 }
 
-// Example using the Template Method pattern
 fn run_with_template() {
     println!("Correct Calculator with Template Method");
 
     // Create evaluator using template method
     let evaluator = template::create_evaluator(true); // true for recursive descent
 
-    let mut variables = std::collections::HashMap::new();
+    let mut variables = HashMap::new();
 
     loop {
         print!("> ");
@@ -358,13 +358,12 @@ fn run_with_template() {
     println!("Goodbye!");
 }
 
-// Example using Strategy pattern
 fn run_with_strategy() {
     println!("Correct Calculator with Strategy Pattern");
 
     // Create evaluator with strategies
     let mut evaluator = strategy::create_standard_evaluator();
-    let mut variables = std::collections::HashMap::new();
+    let mut variables = HashMap::new();
 
     loop {
         print!("> ");
